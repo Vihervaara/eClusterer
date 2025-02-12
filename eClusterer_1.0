@@ -50,8 +50,8 @@ initial_window <- 12500
 extension_window <- 2000
 min_enhancers <- 5
 
-eRPK_limit = 5    ## In the current format, eRPK is the strand-specific read count. 
-
+eRNA_limit = 5    ## In the current format, eRNA_limit is the strand-specific raw read count. 
+                  
 ######################################################
 
 
@@ -180,7 +180,7 @@ preClust_u = preClust_u[order(preClust_u$chr_num, preClust_u$clusterStart),]
 write.table(preClust_u[,c("chr", "clusterStart", "clusterEnd", "clusterCoords")], file=paste(path_eClu,"preliminary_eClusters.txt", sep=""), col.names=F, row.names=F, quote=F, sep="\t")
 
 quit()
-T
+Y
 
 ##################################################################################################################
 
@@ -248,7 +248,8 @@ preDF_ = preDF
 for(i in 1:length(clusterList)) {
 mClu = clusterList[i]
 a = subset(clust, clusterCoords==mClu)
-a_ = subset(a, (eRPK_pl > eRPK_limit & eRPK_mn >eRPK_limit ) | (eRPK_HS30_pl > eRPK_limit & eRPK_HS30_mn > eRPK_limit)) ### eRPK_limit is taken in here.  
+a_ = subset(a, eRPK_pl > eRNA_limit & eRPK_mn > eRNA_limit ) ### eRNA_limit is taken in here. In this data, eRPK is the raw count (eCnt) of PRO-seq read 3'-ends. 
+#a_ = subset(a, (eRPK_pl > eRNA_limit & eRPK_mn > eRNA_limit ) | (eRPK_HS30_pl > eRNA_limit & eRPK_HS30_mn > eRNA_limit)) ### eRNA_limit is taken in here.  
 
 a$eCount=nrow(a)
 a$eCount_eRPKlimit = nrow(a_)
@@ -269,10 +270,10 @@ mClu = preDF[2:(nrow(preDF)),]
 mClu$eClusterLength = mClu$clusterEnd - mClu$clusterStart +1
 
 
-mClusters = subset(mClu, eCount_eRPKlimit>=eRPK_limit)
+mClusters = subset(mClu, eCount_eRPKlimit>=eRNA_limit)
 
-mClusters = subset(mClusters, eRPK_pl > eRPK_limit & eRPK_mn >eRPK_limit )  ### eRPK_limit is taken in here only from the control condition.
-#mClusters = subset(mClusters, (eRPK_pl > eRPK_limit & eRPK_mn >eRPK_limit ) | (eRPK_HS30_pl > eRPK_limit & eRPK_HS30_mn > eRPK_limit))  ### If chosen, eRPK limit can be met either in the ontrol coldition or in the tratment condition.
+mClusters = subset(mClusters, eRPK_pl > eRNA_limit & eRPK_mn >eRNA_limit )  ### eRNA_limit is taken in here only from the control condition.
+#mClusters = subset(mClusters, (eRPK_pl > eRNA_limit & eRPK_mn >eRNA_limit ) | (eRPK_HS30_pl > eRNA_limit & eRPK_HS30_mn > eRNA_limit))  ### If chosen, eRPK limit can be met either in the ontrol coldition or in the tratment condition.
 
 length(unique(mClusters$clusterCoords))
 dim(mClusters)
