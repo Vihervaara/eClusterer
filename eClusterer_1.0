@@ -1,0 +1,356 @@
+#!/bin/sh
+
+#  eCluster_framework_Feb2025.sh
+#  
+#
+#  Created by MolGenLab on 12.2.2025.
+#  Department of Gene Technology, KTH Royal Institute of Gene Technology, Stockholm, Sweden
+#  Science for Life Laboratory, Campus Solna, Stockholm, Sweden.
+#  A. Vihervaara, Assist. Prof.
+
+
+########################################################################
+####################### INFO for running: ##############################
+
+### Naming enhancer coordinates:
+# The code requires enhancer coordinates to be given either:
+# in columns named: chr, eStart, eEnd
+# or reside in columns 1:3
+
+# The code starts by checking, whether the expected names (chr, eStart, eEnd) are present in the input file.
+# If yes, nothing is done. If not columns 1:3 are named "chr", "eStart", "eEnd".
+
+
+### FIRST PART, in R.       == Seeding clusters ==
+# Generates preliminary clusters based on parameters:
+# i)    Seed window. [Default: 12500 nt].
+# ii)   Number of enhancers required in the seed window. [Default: 5 enhancers]
+# iii)  Extension window to search additional, adjacent enhancers. [Default: 2000 nt]
+
+
+### SECOND PART, in shell.   == Merging into eClusters ==
+# The initial clusters are combined if they overlap or touch (head-to-tail) using bedtool merge. Output => eClusters.
+# The eClusters are intersected with enhancers to match each eCluster with its consituting enhancers. 
+#     =>    These files can be used as eClusters and their enhancers. 
+
+### THIRD PART, in R.       == optional expression filter and visualization files ==
+# Adds a threshold (default eRPK > 5) for enhancers that consitute the eClusters.
+# Analyses the heat-induced change in eClusters. It requires the file to have eRNA values from the control and treatment conditions.
+# Output files for genome browser visualization
+
+########################################################################
+########################################################################
+
+R
+
+######################################################
+######   Define the parameters for eClusters   ######
+
+initial_window <- 12500
+extension_window <- 2000
+min_enhancers <- 5
+
+eRPK_limit = 5    ## In the current format, eRPK is the strand-specific read count. 
+
+######################################################
+
+
+
+#######################################################
+### Read in the data and give name for output files ###
+
+#dataName = "K562_hg19_"
+dataName = "DH82_canFam6_"
+
+#Add path to the working dir:
+path_eClu="/Users/molgenlab/DH82_PROseq/eClusters_framework/"
+
+#Read in the enhancer data.
+eData = read.table(paste(path_eClu,"enhancers.txt",sep=""), header=T) 
+#####################################################
+
+
+
+################################################
+######## checking for correct column names ########
+
+if (!("chr" %in% names(eData))) {
+  names(eData)[1] <- "chr"
+}
+
+if (!("eStart" %in% names(eData))) {
+  names(eData)[2] <- "eStart"
+}
+
+if (!("eEnd" %in% names(eData))) {
+  names(eData)[3] <- "eEnd"
+}
+
+################################################
+
+
+
+
+
+#########################################################
+### FIRST PART, in R.       == Seeding clusters ==     ##
+#########################################################
+
+
+#eData = eData[order(eData$chr, eData$eStart),] ### important to order the enhancers based on coordinates.
+
+### since the ordering is generally alphabetical, we ensure here the appropriate ordering.
+
+eData$chr_num <- as.numeric(gsub("chr", "", eData$chr))
+eData$chr_num[is.na(eData$chr_num) & eData$chr == "chrX"] <- 23  # Assign X as 23
+eData$chr_num[is.na(eData$chr_num) & eData$chr == "chrY"] <- 24  # Assign Y as 24
+eData$chr_num[is.na(eData$chr_num) & eData$chr == "chrM"] <- 25  # Assign M as 25
+
+# Sort by numeric chromosome order
+eData <- eData[order(eData$chr_num, eData$eStart), ]
+write.table(eData, file=paste(path_eClu,"eData_noHeader.txt",sep=""), col.names=F, row.names=F, sep="\t", quote=F)
+
+
+### Function for the initial clusters
+find_clusters <- function(cluData, init_win, ext_win, min_enh) {
+  clusters <- list()
+  start_pos <- 1
+  n <- nrow(cluData)
+
+while (start_pos <= n) {
+    current_cluster <- cluData[start_pos, , drop = FALSE]
+    cluster_end <- cluData$eEnd[start_pos] + init_win
+    i <- start_pos + 1
+    while (i <= n) {
+      if (cluData$chr[i] != cluData$chr[start_pos]) break
+      if (cluData$eStart[i] <= cluster_end) {
+        current_cluster <- rbind(current_cluster, cluData[i, , drop = FALSE])
+        cluster_end <- max(cluster_end, cluData$eEnd[i] + ext_win)
+      } else {
+        break
+      }
+      i <- i + 1
+    }
+    if (nrow(current_cluster) >= min_enh) {
+      clusters <- append(clusters, list(current_cluster))
+    }
+    start_pos <- start_pos + 1
+  }
+  return(clusters)
+}
+
+
+enhancer_clusters <- find_clusters(eData, initial_window, extension_window, min_enhancers)
+
+
+
+preClust = as.data.frame = enhancer_clusters[[1]]
+preClust$clusterName = "pre1"
+preClust$countEnhancers = as.numeric(0)
+preClust$clusterStart = as.numeric(0)
+preClust$clusterEnd = as.numeric(0)
+preClust$clusterLength = preClust[nrow(preClust),"eEnd"] - preClust[1,"eStart"]
+preClust$clusterCoords=""
+
+
+preClust = preClust[1,]
+
+
+for (cluster in enhancer_clusters) {
+cluster$clusterName = ""
+cluster$countEnhancers=nrow(cluster)
+cluster$clusterStart = as.numeric(cluster[1,"eStart"])
+cluster$clusterEnd = as.numeric(cluster[nrow(cluster),"eEnd"])
+cluster$clusterLength = cluster[nrow(cluster),"eEnd"] - cluster[1,"eStart"]
+cluster$clusterCoords=paste(cluster$chr,":",cluster[1,"eStart"],"-",cluster[nrow(cluster),"eEnd"],sep="")
+preClust = rbind(preClust,cluster)
+}
+
+
+preClust = preClust[2:nrow(preClust),]
+
+
+#dim(preClust) ### prints enhancers within the preclusters.
+#length(unique(preClust$clusterCoords)) ### prints the number of initial clusters.
+
+
+preClust_u = preClust[!duplicated(preClust$clusterCoords),]
+preClust_u = preClust_u[order(preClust_u$chr_num, preClust_u$clusterStart),]
+
+write.table(preClust_u[,c("chr", "clusterStart", "clusterEnd", "clusterCoords")], file=paste(path_eClu,"preliminary_eClusters.txt", sep=""), col.names=F, row.names=F, quote=F, sep="\t")
+
+quit()
+T
+
+##################################################################################################################
+
+
+
+
+################# ################# ################# ################# ################# ################# ################# ################# #################
+###   SECOND PART, in shell.   == Merging into eClusters == ###
+################# ################# ################# ################# ################# ################# ################# ################# ################# #################
+
+#cd to your working directory
+
+bedtools merge -i preliminary_eClusters.txt > mergedClusters.bed       
+bedtools intersect -wa -loj -a mergedClusters.bed -b eData_noHeader.txt > eClusters_withEnhancers.bed
+
+################# ################# ################# ################# ################# ################# ################# ################# ################# #################
+
+
+
+
+
+###########################################################################
+###      THIRD PART, in R.     == expression filter, visualization ==    ##
+###########################################################################
+
+R
+
+
+clust = read.table(paste(path_eClu,"eClusters_withEnhancers.bed", sep=""))
+
+names(clust)=c("Chr", "clusterStart", "clusterEnd", names(eData))
+clust$clusterCoords = paste(clust$chr,":", clust$clusterStart, "-", clust$clusterEnd, sep="")
+
+clust <- clust[order(clust$chr_num, clust$eStart), ]
+
+dim(clust)
+length(unique(clust$clusterCoords))
+
+
+clusterList =unique(clust$clusterCoords)
+
+
+clust$eRPK = clust$NHS_gbRPK
+clust$eRPK_pl = clust$gbRdCnt_NHS_plus
+clust$eRPK_mn = clust$gbRdCnt_NHS_minus
+
+clust$eRPK_HS30_pl = clust$gbRdCnt_HS30_plus
+clust$eRPK_HS30_mn = clust$gbRdCnt_HS30_minus
+
+
+preDF = clust[1,]
+
+preDF$eCount = as.integer(0)
+preDF$eCount_eRPKlimit = as.integer(0)
+preDF$eCluSUM_C= as.numeric(0)
+preDF$eCluMEAN_C= as.numeric(0)
+preDF$eCluStDev_C= as.numeric(0)
+preDF$eCluSUM_HS= as.numeric(0)
+preDF$eCluMEAN_HS= as.numeric(0)
+preDF$eCluStDev_HS= as.numeric(0)
+
+preDF_ = preDF
+
+
+for(i in 1:length(clusterList)) {
+mClu = clusterList[i]
+a = subset(clust, clusterCoords==mClu)
+a_ = subset(a, (eRPK_pl > eRPK_limit & eRPK_mn >eRPK_limit ) | (eRPK_HS30_pl > eRPK_limit & eRPK_HS30_mn > eRPK_limit)) ### eRPK_limit is taken in here.  
+
+a$eCount=nrow(a)
+a$eCount_eRPKlimit = nrow(a_)
+a$eCluSUM_C=sum(a$eRPK_pl)+sum(a$eRPK_mn)
+a$eCluMEAN_C=(sum(a$eRPK_pl)+sum(a$eRPK_mn))/nrow(a)
+a$eCluStDev_C=sd(c(a$eRPK_pl, a$eRPK_mn))
+
+a$eCluSUM_HS=sum(a$eRPK_HS30_pl)+sum(a$eRPK_HS30_mn)
+a$eCluMEAN_HS=(sum(a$eRPK_HS30_pl)+sum(a$eRPK_HS30_mn))/nrow(a)
+a$eCluStDev_HS=sd(c(a$eRPK_HS30_pl, a$eRPK_HS30_mn))
+
+preDF = rbind(preDF, a)
+
+}
+
+mClu = preDF[2:(nrow(preDF)),]
+
+mClu$eClusterLength = mClu$clusterEnd - mClu$clusterStart +1
+
+
+mClusters = subset(mClu, eCount_eRPKlimit>=eRPK_limit)
+
+mClusters = subset(mClusters, eRPK_pl > eRPK_limit & eRPK_mn >eRPK_limit )  ### eRPK_limit is taken in here only from the control condition.
+#mClusters = subset(mClusters, (eRPK_pl > eRPK_limit & eRPK_mn >eRPK_limit ) | (eRPK_HS30_pl > eRPK_limit & eRPK_HS30_mn > eRPK_limit))  ### If chosen, eRPK limit can be met either in the ontrol coldition or in the tratment condition.
+
+length(unique(mClusters$clusterCoords))
+dim(mClusters)
+
+
+####################################################################################################
+### Adds a unique cluster name and ensures the coordinates match after applying the expression limit.
+
+refinedClusterList =unique(mClusters$clusterCoords)
+
+preDF2 = mClusters[1,]
+preDF2$eClusterStart=0
+preDF2$eClusterEnd=0
+preDF$eClusterLength=0
+preDF2$eClusterCoordinates=""
+preDF2$eCluster=""
+
+
+for(i in 1:length(refinedClusterList)) {
+eC = refinedClusterList[i]
+cluster = subset(mClusters, clusterCoords==eC)
+
+cluster$eClusterStart = as.numeric(cluster[1,"eStart"])
+cluster$eClusterEnd = as.numeric(cluster[nrow(cluster),"eEnd"])
+cluster$eClusterLength = cluster[nrow(cluster),"eEnd"] - cluster[1,"eStart"]
+cluster$eClusterCoordinates=paste(cluster$chr,":",cluster[1,"eStart"],"-",cluster[nrow(cluster),"eEnd"],sep="")
+cluster$eCluster = paste(dataName,"eCluster",i,sep="")
+
+preDF2 = rbind(preDF2,cluster)
+
+}
+
+
+eCluster = preDF2[2:(nrow(preDF2)),]
+
+
+
+eCluster$color="0,150,200"
+eCluster$eLength=eCluster$eEnd-eCluster$eStart +1
+
+eCluster_bed_u = eCluster[!duplicated(eCluster$eCluster),]
+row.names(eCluster_bed_u)=eCluster_bed_u$eCluster
+
+eCluster_bed = eCluster[,c("chr", "clusterStart", "clusterEnd", "eCluster", "eCluSUM_C", "strand_plus", "clusterStart", "clusterEnd", "color", "eCount_eRPKlimit")]
+
+eCluster_bed_u$blockSizes = as.numeric(0)
+eCluster_bed_u$blockStarts = as.numeric(0)
+
+eCluster = eCluster[order(eCluster$chr_num, eCluster$eStart),]
+for(i in unique(eCluster_bed_u$eCluster)){
+#print(i)
+
+tempData=subset(eCluster, eCluster==i)
+tempData= tempData[order(tempData$eStart),]
+eCluster_bed_u[i, "blockSizes"] <- paste(tempData$eLength, collapse=",")
+eCluster_bed_u[i, "blockStarts"] <- paste(tempData$eStart, collapse=",")
+}
+
+
+eCluster_bed = eCluster[,c("chr", "eStart", "eEnd", "geneName", "eRPK", "strand_plus", "eStart", "eEnd", "color", "eCluster")]
+
+names(eCluster_bed)[4]="enhancer"
+
+eCluster_bed$color="0,200,150"
+
+clustered_enhancers = eCluster_bed[,1:9]
+names(clustered_enhancers) = c("chr", "start", "end", "name", "score", "strand", "start2", "end2", "color")
+
+
+
+enhancer_clusters = eCluster_bed_u[,c("chr", "clusterStart", "clusterEnd", "eCluster", "eCluSUM_C", "strand_plus", "clusterStart", "clusterEnd", "color")]
+names(enhancer_clusters) = c("chr", "start", "end", "name", "score", "strand", "start2", "end2", "color")
+
+
+
+testData = rbind(enhancer_clusters, clustered_enhancers)
+testData = testData[order(testData[,1], testData[,2]),]
+
+write.table(testData, file=paste(path_eClu, dataName,"eClusters_and_clusteredEnhancers_noHeader.bed", sep=""), col.names=F, row.names=F, quote=F, sep="\t")
+
+
