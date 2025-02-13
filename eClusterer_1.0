@@ -180,7 +180,7 @@ preClust_u = preClust_u[order(preClust_u$chr_num, preClust_u$clusterStart),]
 write.table(preClust_u[,c("chr", "clusterStart", "clusterEnd", "clusterCoords")], file=paste(path_eClu,"preliminary_eClusters.txt", sep=""), col.names=F, row.names=F, quote=F, sep="\t")
 
 quit()
-Y
+y
 
 ##################################################################################################################
 
@@ -357,4 +357,5 @@ bedData = bedData[order(bedData[,1], bedData[,2]),]
 
 write.table(bedData, file=paste(path_eClu, dataName,"eClusters_and_clusteredEnhancers.bed", sep=""), col.names=F, row.names=F, quote=F, sep="\t")
 
-
+quit()
+y
