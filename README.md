@@ -11,7 +11,7 @@ The code recognised known super-enhancers, such as MYC super-enhancer (active in
 
 
 # CITATION OF eCLUSTERER:
-To cite the eClusterer and see verification of MYC and EMB super-enhancer in dog:
+To cite the eClusterer or eCluster coordinates and verification of MYC and EMB super-enhancers in dog:
 
 Himanen SV, Rabenius A, Aktay S, Tekoniemi J, Vihervaara A (2025). 
 Transcriptional architecture and Pol II regulation at promoters, enhancers, and enhancer clusters in Canis lupus familiaris. 
