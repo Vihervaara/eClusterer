@@ -34,31 +34,31 @@ https://academic.oup.com/nar/article/44/D1/D164/2502575.
 ########################################################################
 ####################### INFO for running: ##############################
 
-### Naming enhancer coordinates:
-# The code requires enhancer coordinates to be given either:
-# in columns named: chr, eStart, eEnd
-# or reside in columns 1:3
+## Naming enhancer coordinates:
+ The code requires enhancer coordinates to be given either:
+ in columns named: chr, eStart, eEnd
+ or reside in columns 1:3
 
-# The code starts by checking, whether the expected names (chr, eStart, eEnd) are present in the input file.
-# If yes, the code continues. If not, columns 1:3 are named "chr", "eStart", "eEnd" , whereafter the code continues.
-
-
-### FIRST PART, in R.       == Seeding clusters ==
-# Generates preliminary clusters based on parameters:
-# i)    Seed window. [Default: 12500 nt].
-# ii)   Number of enhancers required in the seed window. [Default: 5 enhancers]
-# iii)  Extension window to search additional, adjacent enhancers. [Default: 2000 nt]
+The code starts by checking, whether the expected names (chr, eStart, eEnd) are present in the input file.
+If yes, the code continues. If not, columns 1:3 are named "chr", "eStart", "eEnd" , whereafter the code continues.
 
 
-### SECOND PART, in shell.   == Merging into eClusters ==
-# The initial clusters are combined if they overlap or touch (head-to-tail) using bedtool merge. Output => eClusters.
-# The eClusters are intersected with enhancers to match each eCluster with its consituting enhancers. 
-#     =>    These files can be used as eClusters and their enhancers. 
+## FIRST PART, in R.       == Seeding clusters ==
+ Generates preliminary clusters based on parameters:
+ i)    Seed window. [Default: 12500 nt].
+ ii)   Number of enhancers required in the seed window. [Default: 5 enhancers]
+ iii)  Extension window to search additional, adjacent enhancers. [Default: 2000 nt]
 
-### THIRD PART, in R.       == optional expression filter and visualization files ==
-# Adds a threshold (default eRNA > 5) for enhancers that consitute the eClusters.
-# Analyses the heat-induced change in eClusters. It requires the file to have eRNA values from the control and treatment conditions.
-# Output files for genome browser visualization
+
+## SECOND PART, in shell.   == Merging into eClusters ==
+ The initial clusters are combined if they overlap or touch (head-to-tail) using bedtool merge. Output => eClusters.
+ The eClusters are intersected with enhancers to match each eCluster with its consituting enhancers. 
+     =>    These files can be used as eClusters and their enhancers. 
+
+## THIRD PART, in R.       == optional expression filter and visualization files ==
+ Adds a threshold (default eRNA > 5) for enhancers that consitute the eClusters.
+ Analyses the heat-induced change in eClusters. It requires the file to have eRNA values from the control and treatment conditions.
+ Output files for genome browser visualization
 
 ########################################################################
 ########################################################################
